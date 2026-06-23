@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Shooter</title>
+  <style>
+    body {
+      margin: 0;
+      overflow: hidden;
+      background: rgb(31, 97, 138);
+    }
+
+    canvas {
+      display: block;
+      background: #c4f0f3;
+    }
+
+    #restart {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      padding: 10px;
+      font-size: 16px;
+      display: none;
+      z-index: 10;
+    }
+  </style>
+</head>
+<body>
+
+<button id="restart">Restart</button>
+<canvas id="game"></canvas>
+
+<script>
+const canvas = document.getElementById("game")
+const ctx = canvas.getContext("2d")
+const restartBtn = document.getElementById("restart")
+
+function resize() {
+  canvas.width = window.innerWidth
+  canvas.height = window.innerHeight
+}
+
+window.addEventListener("resize", resize)
+resize()
+
+let p1, p2, bullets, keys, texts, gameOver
+
+function reset() {
+  p1 = { x: 100, y: 300, hp: 100 }
+  p2 = { x: 800, y: 300, hp: 100 }
+  bullets = []
+  keys = []
+  texts = []
+  gameOver = false
+  restartBtn.style.display = "none"
+}
+
+reset()
+
+document.addEventListener("keydown", e => keys[e.key] = true)
+document.addEventListener("keyup", e => keys[e.key] = false)
+
+restartBtn.onclick = reset
+
+function shoot(x, y, dir) {
+  bullets.push({ x, y, vx: dir })
+}
+
+function drawPlayer(x, y, color) {
+  ctx.strokeStyle = color
+  ctx.fillStyle = color
+
+  ctx.beginPath()
+  ctx.arc(x, y - 20, 10, 0, Math.PI * 2)
+  ctx.fill()
+
+  ctx.fillRect(x - 5, y - 10, 10, 30)
+
+  ctx.beginPath()
+  ctx.moveTo(x - 5, y)
+  ctx.lineTo(x - 20, y + 10)
+  ctx.moveTo(x + 5, y)
+  ctx.lineTo(x + 20, y + 10)
+  ctx.stroke()
+
+  ctx.beginPath()
+  ctx.moveTo(x, y + 20)
+  ctx.lineTo(x - 10, y + 40)
+  ctx.moveTo(x, y + 20)
+  ctx.lineTo(x + 10, y + 40)
+  ctx.stroke()
+}
+
+function addText(txt, x, y, color) {
+  texts.push({ txt, x, y, life: 60, color })
+}
+
+function update() {
+  if (gameOver) return
+
+  if (keys["w"]) p1.y -= 5
+  if (keys["s"]) p1.y += 5
+  if (keys["a"]) p1.x -= 5
+  if (keys["d"]) p1.x += 5
+
+  if (keys["ArrowUp"]) p2.y -= 5
+  if (keys["ArrowDown"]) p2.y += 5
+  if (keys["ArrowLeft"]) p2.x -= 5
+  if (keys["ArrowRight"]) p2.x += 5
+
+  if (keys["f"]) {
+    if (!p1.last || Date.now() - p1.last > 300) {
+      shoot(p1.x + 10, p1.y, 8)
+      p1.last = Date.now()
+    }
+  }
+
+  if (keys["l"]) {
+    if (!p2.last || Date.now() - p2.last > 300) {
+      shoot(p2.x - 10, p2.y, -8)
+      p2.last = Date.now()
+    }
+  }
+
+  for (let i = 0; i < bullets.length; i++) {
+    bullets[i].x += bullets[i].vx
+
+    function headshot(p) {
+      return bullets[i].x > p.x - 8 &&
+             bullets[i].x < p.x + 8 &&
+             bullets[i].y > p.y - 35 &&
+             bullets[i].y < p.y - 15
+    }
+
+    function bodyhit(p) {
+      return bullets[i].x > p.x - 10 &&
+             bullets[i].x < p.x + 10 &&
+             bullets[i].y > p.y - 30 &&
+             bullets[i].y < p.y + 40
+    }
+
+    if (headshot(p2)) {
+      p2.hp -= 20
+      addText("HEADSHOT", p2.x, p2.y - 40, "red")
+      bullets.splice(i, 1)
+      i--
+    }
+    else if (bodyhit(p2)) {
+      p2.hp -= 10
+      bullets.splice(i, 1)
+      i--
+    }
+
+    else if (headshot(p1)) {
+      p1.hp -= 20
+      addText("HEADSHOT", p1.x, p1.y - 40, "red")
+      bullets.splice(i, 1)
+      i--
+    }
+    else if (bodyhit(p1)) {
+      p1.hp -= 10
+      bullets.splice(i, 1)
+      i--
+    }
+
+    if (p1.hp <= 0 || p2.hp <= 0) {
+      gameOver = true
+      restartBtn.style.display = "block"
+    }
+  }
+
+  texts = texts.filter(t => --t.life > 0)
+}
+
+function draw() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height)
+
+  drawPlayer(p1.x, p1.y, "blue")
+  drawPlayer(p2.x, p2.y, "red")
+
+  ctx.fillStyle = "black"
+  bullets.forEach(b => ctx.fillRect(b.x, b.y, 5, 5))
+
+  ctx.fillStyle = "green"
+  ctx.font = "20px Arial"
+  ctx.fillText("HP P1: " + p1.hp, 20, 30)
+  ctx.fillText("HP P2: " + p2.hp, canvas.width - 150, 30)
+
+  for (let t of texts) {
+    ctx.fillStyle = t.color
+    ctx.fillText(t.txt, t.x, t.y)
+  }
+
+  if (p1.hp <= 0) ctx.fillText("Player 2 gewinnt", canvas.width / 2 - 100, canvas.height / 2)
+  if (p2.hp <= 0) ctx.fillText("Player 1 gewinnt", canvas.width / 2 - 100, canvas.height / 2)
+}
+
+function loop() {
+  update()
+  draw()
+  requestAnimationFrame(loop)
+}
+
+loop()
+</script>
+
+</body>
+</html>
